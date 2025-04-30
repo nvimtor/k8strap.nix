@@ -15,7 +15,7 @@
 
   outputs = inputs@{ flake-parts, nixpkgs, self, ... }: flake-parts.lib.mkFlake { inherit inputs; } {
     imports = [
-      ./internal/terranix-parts.nix
+      ./internal
     ];
 
     systems = [
@@ -33,14 +33,6 @@
       };
     in {
       _module.args.pkgs = pkgs;
-
-      devShells = {
-        default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            git-crypt
-          ];
-        };
-      };
     };
   };
 }
