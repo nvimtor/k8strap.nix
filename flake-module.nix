@@ -16,7 +16,7 @@ in {
               type = types.submodule {
                 options = {
                   crds = mkOption {
-                    type = types.listOf (types.functionTo (types.deferredModule));
+                    type = types.listOf types.anything;
                     description = ''Custom Resource Definitions (CRDs) to use for ${name}.
                 These will populate `kubenix.customTypes`.
                     '';
@@ -40,7 +40,7 @@ in {
                     default = [];
                   };
                   modules = mkOption {
-                    type = types.listOf types.deferredModule;
+                    type = types.listOf types.anything;
                     default = [];
                     description = "Kubenix modules to use for ${name}";
                     example = litExpr ''
@@ -76,10 +76,19 @@ in {
     in {
       packages = mapAttrs (_: cluster: let
         manifests = (inputs.kubenix.evalModules.${system} {
-          module = { kubenix, ... }: {
-            imports = map ((m: importApply m { inherit kubenix; })) cluster.kubenix.modules;
+          module = { kubenix, ... }: let
+            callWithKubenix = m: importApply m { inherit kubenix; };
+
+            crds = importApply
+              ./kubenix/crd.nix
+              (kubenix: map callWithKubenix cluster.kubenix.crds);
+          in {
+            imports = (map callWithKubenix cluster.kubenix.modules) ++ [crds];
           };
-          specialArgs = cluster.kubenix.specialArgs;
+          specialArgs = cluster.kubenix.specialArgs // {
+            inherit inputs;
+            kubenixPath = "${inputs.kubenix}";
+          };
         }).config.kubernetes.resultYAML;
       in manifests) cfg.clusters;
     };
