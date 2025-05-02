@@ -1,0 +1,11 @@
+/*
+!.git-crypt
+!internal
+!kubenix
+!flake.nix
+!flake-module.nix
+!flake.lock
+!.terraform.lock.hcl
+!terraform.tfstate
+!.gitignore
+!.gitattributes
