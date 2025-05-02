@@ -1,6 +1,8 @@
-{ inputs, lib, config, ... }: let
+{ inputs, lib, config, moduleWithSystem, ... }: let
+  inherit (lib.attrsets) foldlAttrs;
   inherit (lib.options) mkOption literalExpression;
-  inherit (lib) types mapAttrs mkIf;
+  inherit (lib.lists) concatMap;
+  inherit (lib) types mapAttrs genAttrs mkMerge;
 
   litExpr = literalExpression;
   cfg = config.k8strap;
@@ -65,6 +67,12 @@ in {
               };
               description = "Kubenix configuration for ${name}.";
             };
+
+            k3sHosts = mkOption {
+              description = "Apply k3s.";
+              type = types.listOf types.str;
+              default = [];
+            };
           };
         }));
       };
@@ -74,7 +82,7 @@ in {
     perSystem = { pkgs, system, lib, ... }: let
       inherit (lib.modules) importApply;
     in {
-      packages = mapAttrs (_: cluster: let
+      packages = mapAttrs (cname: cluster: let
         manifests = (inputs.kubenix.evalModules.${system} {
           module = { kubenix, ... }: let
             callWithKubenix = m: importApply m { inherit kubenix; };
@@ -90,7 +98,45 @@ in {
             kubenixPath = "${inputs.kubenix}";
           };
         }).config.kubernetes.resultYAML;
-      in manifests) cfg.clusters;
+      in pkgs.stdenv.mkDerivation {
+        name = "${cname}-manifests";
+        buildCommand = ''
+          mkdir -p $out/${cname}
+          cp ${manifests} $out/${cname}/manifest.yaml
+        '';
+      }) cfg.clusters;
+    };
+
+    flake = {
+      nixosModules.k8strap = moduleWithSystem (
+        perSystem@{ config }:
+        nixos@{ ... }: let
+        in {
+
+        }
+      );
     };
   };
 }
+
+/*
+
+{
+        clusterName,
+        manifestsDir ? "/var/lib/rancher/k3s/server/manifests"
+      }: { lib, pkgs, ... }: let
+        pkgName      = "${clusterName}-manifests";
+        manifestPkg  = inputs.self.packages.${pkgs.stdenv.system}.${pkgName};
+        manifestFile = "${manifestPkg}/${clusterName}/manifest.yaml";
+      in
+        {
+          config.environment.etc."k8strap/${clusterName}.yaml".source = manifestFile;
+
+          config.system.activationScripts.k8strap-link.text = ''
+            install -d -m0755 ${lib.escapeShellArg manifestsDir}
+            ln -sf /etc/k8strap/${clusterName}.yaml \
+              ${lib.escapeShellArg manifestsDir}/${clusterName}.yaml
+          '';
+        };
+
+*/
