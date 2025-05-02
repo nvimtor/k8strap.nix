@@ -1,23 +1,27 @@
-{ lib, ... }: let
+{ inputs, lib, config, ... }: let
   inherit (lib.options) mkOption literalExpression;
-  inherit (lib) types;
+  inherit (lib) types mapAttrs mkIf;
 
   litExpr = literalExpression;
+  cfg = config.k8strap;
 in {
   options = {
-    clusters = {
-      description = "Kubernetes clusters";
-      type = types.attrsOf (types.submodule ({ name, config, ... }: {
-        options = {
-          kubenix = mkOption {
-            type = types.attrsOf {
-              crds = mkOption {
-                type = types.listOf (types.functionTo (types.deferredModule));
-                description = ''Custom Resource Definitions (CRDs) to use for ${name}.
+    k8strap = {
+      clusters = mkOption {
+        description = "Kubernetes clusters";
+        default = {};
+        type = types.attrsOf (types.submodule ({ name, config, ... }: {
+          options = {
+            kubenix = mkOption {
+              type = types.submodule {
+                options = {
+                  crds = mkOption {
+                    type = types.listOf (types.functionTo (types.deferredModule));
+                    description = ''Custom Resource Definitions (CRDs) to use for ${name}.
                 These will populate `kubenix.customTypes`.
-                '';
-                example = litExpr ''
-                  { kubenix }: { inputs, ... }: {
+                    '';
+                    example = litExpr ''
+                      { kubenix }: { inputs, ... }: {
                     imports = with kubenix.modules; [
                       helm
                     ];
@@ -32,44 +36,52 @@ in {
                       };
                     };
                   }
-                '';
-                default = [];
-              };
-
-              modules = mkOption {
-                type = types.listOf (types.functionTo (types.deferredModule));
-                default = [];
-                description = "Kubenix modules to use for ${name}";
-                example = litExpr ''
-                  { kubenix }: { inputs, ... }: {
+                    '';
+                    default = [];
+                  };
+                  modules = mkOption {
+                    type = types.listOf types.deferredModule;
+                    default = [];
+                    description = "Kubenix modules to use for ${name}";
+                    example = litExpr ''
+                      { kubenix }: { inputs, ... }: {
                     imports = with kubenix.modules; [
                        k8s
                     ];
 
                     kubernetes.resources.namespaces.argocd = { };
                   }
-                '';
+                    '';
+                  };
+                  specialArgs = mkOption {
+                    type = types.lazyAttrsOf types.raw;
+                    default = {};
+                    description = "${name}'s special arguments to be passed to Kubenix modules.";
+                    example = literalExpression ''
+                      { foo = "bar"; }
+                    '';
+                  };
+                };
               };
-
-              specialArgs = mkOption {
-                type = types.lazyAttrsOf types.raw;
-                default = {};
-                description = "${name}'s special arguments to be passed to Kubenix modules.";
-                example = literalExpression ''
-                  { foo = "bar"; }
-                '';
-              };
+              description = "Kubenix configuration for ${name}.";
             };
-            description = "Kubenix configuration for ${name}.";
           };
-        };
-      }));
-      modules = mkOption {
-        type = types.listOf types.deferredModule;
+        }));
       };
     };
   };
   config = {
-
+    perSystem = { pkgs, system, lib, ... }: let
+      inherit (lib.modules) importApply;
+    in {
+      packages = mapAttrs (_: cluster: let
+        manifests = (inputs.kubenix.evalModules.${system} {
+          module = { kubenix, ... }: {
+            imports = map ((m: importApply m { inherit kubenix; })) cluster.kubenix.modules;
+          };
+          specialArgs = cluster.kubenix.specialArgs;
+        }).config.kubernetes.resultYAML;
+      in manifests) cfg.clusters;
+    };
   };
 }

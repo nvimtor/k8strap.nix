@@ -34,5 +34,10 @@
     in {
       _module.args.pkgs = pkgs;
     };
+
+    flake = {
+      flakeModule = ./flake-module.nix;
+      flakeModules.default = ./flake-module.nix;
+    };
   };
 }
