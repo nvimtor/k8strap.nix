@@ -1,6 +1,7 @@
 /*
 !.git-crypt
 !internal
+!example
 !kubenix
 !flake.nix
 !flake-module.nix

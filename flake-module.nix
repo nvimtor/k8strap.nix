@@ -111,7 +111,7 @@ in {
       packages = clusterPkgs;
       apps = mapAttrs (cname: drv: {
         type = "app";
-        program = (writeShellApplication {
+        program = writeShellApplication {
           name = "copy-${cname}";
           runtimeInputs = [ pkgs.rsync ];
           text = ''
@@ -121,22 +121,18 @@ in {
             rsync -aL --delete "${drv}/${cname}/" "$dest/"
             echo "Copied → $dest"
           '';
-        });
+        };
       }) clusterPkgs;
     };
 
     flake = {
-      nixosModules.default = "abc";
-      # nixosModules.default = ({ ... }: {
-      #   services.openssh.enable = true;
-      # });
-      # nixosModules.k8strap = moduleWithSystem (
-      #   perSystem@{ config }:
-      #   nixos@{ ... }: let
-      #   in {
-      #     services.openssh.enable = true;
-      #   }
-      # );
+      nixosModules.k8strap = moduleWithSystem (
+        perSystem@{ config }:
+        nixos@{ ... }: let
+        in {
+          services.openssh.enable = true;
+        }
+      );
     };
   };
 }
