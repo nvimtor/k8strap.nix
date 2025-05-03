@@ -65,11 +65,11 @@
         "terranix": "terranix"
       },
       "locked": {
-        "lastModified": 1746269051,
-        "narHash": "sha256-gABVobH7EV8w13b2a4J9P7SYNHNQq8oqiDCj7gX9Cv4=",
+        "lastModified": 1746274362,
+        "narHash": "sha256-fnFDBobUsGmXaAmTs9CXQM/N1ka0eU8E2bD/+IWJtUo=",
         "owner": "nvimtor",
         "repo": "k8strap.nix",
-        "rev": "8afdeb3f36774cc2db7915e66a6a2123fbc1485d",
+        "rev": "f0700f49120efc590bb3aef73e10fd5ecc15ed03",
         "type": "github"
       },
       "original": {
