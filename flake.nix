@@ -16,6 +16,7 @@
   outputs = inputs@{ flake-parts, nixpkgs, self, ... }: flake-parts.lib.mkFlake { inherit inputs; } {
     imports = [
       ./internal
+      ./flake-module.nix
     ];
 
     systems = [

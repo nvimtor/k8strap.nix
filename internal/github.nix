@@ -28,8 +28,8 @@
   resource = {
     github_repository.k8strap-nix = {
       name = "k8strap.nix";
-      description = "My small, opinionated Nix module to bootstrap Kubernetes clusters using kubenix & nixidy.";
-      visibility = "private";
+      description = "";
+      visibility = "public";
     };
   };
 }

@@ -1,8 +1,8 @@
 { inputs, lib, config, moduleWithSystem, ... }: let
-  inherit (lib.attrsets) foldlAttrs;
+  inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
   inherit (lib.options) mkOption literalExpression;
   inherit (lib.lists) concatMap;
-  inherit (lib) types mapAttrs genAttrs mkMerge;
+  inherit (lib) types mapAttrs genAttrs mkMerge pipe getExe;
 
   litExpr = literalExpression;
   cfg = config.k8strap;
@@ -41,6 +41,7 @@ in {
                     '';
                     default = [];
                   };
+
                   modules = mkOption {
                     type = types.listOf types.anything;
                     default = [];
@@ -55,6 +56,7 @@ in {
                   }
                     '';
                   };
+
                   specialArgs = mkOption {
                     type = types.lazyAttrsOf types.raw;
                     default = {};
@@ -68,13 +70,29 @@ in {
               description = "Kubenix configuration for ${name}.";
             };
 
+
+
             k3sHosts = mkOption {
               description = "Apply k3s.";
-              type = types.listOf types.str;
-              default = [];
+              type = types.attrsOf (types.submodule ({ name, config, ... }: {
+                options = {
+                  manifestsDir = {
+                    type = types.str;
+                    description = "Where k3s stores its manifests file for ${name}.";
+                    default = "/etc/rancher/k3s/server/manifests";
+                  };
+                };
+              }));
+              default = {};
             };
           };
         }));
+      };
+
+      outputDir = mkOption {
+        type        = types.str;
+        default     = "outputs";
+        description = "Where rendered manifests for clusters are stored. ";
       };
     };
   };
@@ -116,7 +134,7 @@ in {
           runtimeInputs = [ pkgs.rsync ];
           text = ''
             set -euo pipefail
-            dest="$PWD/manifests/${cname}"
+            dest="$PWD/${cfg.outputDir}/${cname}"
             mkdir -p "$dest"
             rsync -aL --delete "${drv}/${cname}/" "$dest/"
             echo "Copied → $dest"
@@ -126,13 +144,26 @@ in {
     };
 
     flake = {
-      nixosModules.k8strap = moduleWithSystem (
-        perSystem@{ config }:
-        nixos@{ ... }: let
+      nixosModules = let
+        mkModule = cname: { pkgs, ... }: let
+          repoRoot   = inputs.self;
+          clusterDir = repoRoot + "/${cfg.outputDir}/${cname}";
         in {
-          services.openssh.enable = true;
-        }
-      );
+          environment.etc."k8strap/${cname}".source = clusterDir;
+
+          system.activationScripts.k8strap-manifests.text = ''
+            dest="${cfg.manifestsDir}"
+            mkdir -p "$dest"
+            ${getExe pkgs.rsync} -a --delete /etc/k8strap/${cname}/ "$dest/"
+          '';
+        };
+      in
+        mkMerge (mapAttrsToList
+          (cname: cval: mapAttrs' (host: cfg: {
+            name = "k8strap-${host}";
+            value = mkModule cname;
+          }) cval.k3sHosts)
+          cfg.clusters);
     };
   };
 }
