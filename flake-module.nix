@@ -81,62 +81,62 @@ in {
   config = {
     perSystem = { pkgs, system, lib, ... }: let
       inherit (lib.modules) importApply;
-    in {
-      packages = mapAttrs (cname: cluster: let
-        manifests = (inputs.kubenix.evalModules.${system} {
-          module = { kubenix, ... }: let
-            callWithKubenix = m: importApply m { inherit kubenix; };
+      inherit (pkgs) writeShellApplication;
+      inherit (pkgs.stdenv) mkDerivation;
 
-            crds = importApply
-              ./kubenix/crd.nix
-              (kubenix: map callWithKubenix cluster.kubenix.crds);
-          in {
-            imports = (map callWithKubenix cluster.kubenix.modules) ++ [crds];
-          };
-          specialArgs = cluster.kubenix.specialArgs // {
-            inherit inputs;
-            kubenixPath = "${inputs.kubenix}";
-          };
-        }).config.kubernetes.resultYAML;
-      in pkgs.stdenv.mkDerivation {
-        name = "${cname}-manifests";
-        buildCommand = ''
-          mkdir -p $out/${cname}
-          cp ${manifests} $out/${cname}/manifest.yaml
-        '';
-      }) cfg.clusters;
+      clusterPkgs =
+        mapAttrs (cname: cluster: let
+          manifests =
+            (inputs.kubenix.evalModules.${system} {
+              module = { kubenix, ... }: let
+                callWithKubenix = m: importApply m { inherit kubenix; };
+                crds = importApply ./kubenix/crd.nix
+                  (kubenix: map callWithKubenix cluster.kubenix.crds);
+              in {
+                imports = [ crds ] ++ (map callWithKubenix cluster.kubenix.modules);
+              };
+              specialArgs = {
+                inherit inputs;
+                kubenixPath = "${inputs.kubenix}";
+              } // cluster.kubenix.specialArgs;
+            }).config.kubernetes.resultYAML;
+        in mkDerivation {
+          name = "${cname}-manifests";
+          buildCommand = ''
+            mkdir -p $out/${cname}
+            cp ${manifests} $out/${cname}/manifest.yaml
+          '';
+        }) cfg.clusters;
+    in {
+      packages = clusterPkgs;
+      apps = mapAttrs (cname: drv: {
+        type = "app";
+        program = (writeShellApplication {
+          name = "copy-${cname}";
+          runtimeInputs = [ pkgs.rsync ];
+          text = ''
+            set -euo pipefail
+            dest="$PWD/manifests/${cname}"
+            mkdir -p "$dest"
+            rsync -aL --delete "${drv}/${cname}/" "$dest/"
+            echo "Copied → $dest"
+          '';
+        });
+      }) clusterPkgs;
     };
 
     flake = {
-      nixosModules.k8strap = moduleWithSystem (
-        perSystem@{ config }:
-        nixos@{ ... }: let
-        in {
-
-        }
-      );
+      nixosModules.default = "abc";
+      # nixosModules.default = ({ ... }: {
+      #   services.openssh.enable = true;
+      # });
+      # nixosModules.k8strap = moduleWithSystem (
+      #   perSystem@{ config }:
+      #   nixos@{ ... }: let
+      #   in {
+      #     services.openssh.enable = true;
+      #   }
+      # );
     };
   };
 }
-
-/*
-
-{
-        clusterName,
-        manifestsDir ? "/var/lib/rancher/k3s/server/manifests"
-      }: { lib, pkgs, ... }: let
-        pkgName      = "${clusterName}-manifests";
-        manifestPkg  = inputs.self.packages.${pkgs.stdenv.system}.${pkgName};
-        manifestFile = "${manifestPkg}/${clusterName}/manifest.yaml";
-      in
-        {
-          config.environment.etc."k8strap/${clusterName}.yaml".source = manifestFile;
-
-          config.system.activationScripts.k8strap-link.text = ''
-            install -d -m0755 ${lib.escapeShellArg manifestsDir}
-            ln -sf /etc/k8strap/${clusterName}.yaml \
-              ${lib.escapeShellArg manifestsDir}/${clusterName}.yaml
-          '';
-        };
-
-*/
