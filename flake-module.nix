@@ -65,12 +65,21 @@ in {
                       { foo = "bar"; }
                     '';
                   };
+
+                  template = mkOption {
+                    type = types.str;
+                    default = ''
+                      {{.kind}}-{{.metadata.name}}.yaml
+                    '';
+                    description = ''
+                      By default, Kubenix generates a single file containing all resources.
+                      This option lets you break it up using kubectl-slice.
+                    '';
+                  };
                 };
               };
               description = "Kubenix configuration for ${name}.";
             };
-
-
 
             k3sHosts = mkOption {
               description = "Apply k3s.";
@@ -99,8 +108,20 @@ in {
   config = {
     perSystem = { pkgs, system, lib, ... }: let
       inherit (lib.modules) importApply;
-      inherit (pkgs) writeShellApplication;
+      inherit (pkgs) writeShellApplication buildGo124Module fetchFromGitHub;
       inherit (pkgs.stdenv) mkDerivation;
+
+      kubectl-slice = buildGo124Module rec {
+        pname = "kubectl-slice";
+        version = "1.4.2";
+        src = fetchFromGitHub {
+          owner = "patrickdappollonio";
+          repo = pname;
+          tag = "v${version}";
+          hash = "sha256-C9YxMP9MCKJXh3wQ1JoilpzI3nIH3LnsTeVPMzri5h8=";
+        };
+        vendorHash = "sha256-Lly8gGLkpBAT+h1TJNkt39b5CCrn7xuVqrOjl7RWX7w=";
+      };
 
       clusterPkgs =
         mapAttrs (cname: cluster: let
@@ -118,11 +139,16 @@ in {
                 kubenixPath = "${inputs.kubenix}";
               } // cluster.kubenix.specialArgs;
             }).config.kubernetes.resultYAML;
+
+          sliceTpl = pkgs.writeText "slice.tpl" cluster.kubenix.template;
         in mkDerivation {
           name = "${cname}-manifests";
           buildCommand = ''
             mkdir -p $out/${cname}
-            cp ${manifests} $out/${cname}/manifest.yaml
+            ${kubectl-slice}/bin/kubectl-slice \
+            -f ${manifests} \
+            -o $out/${cname}/ \
+            -t "$(cat ${sliceTpl})"
           '';
         }) cfg.clusters;
     in {
