@@ -85,10 +85,10 @@ in {
               description = "Apply k3s.";
               type = types.attrsOf (types.submodule ({ name, config, ... }: {
                 options = {
-                  manifestsDir = {
+                  manifestsDir = mkOption {
                     type = types.str;
                     description = "Where k3s stores its manifests file for ${name}.";
-                    default = "/etc/rancher/k3s/server/manifests";
+                    default = "/var/lib/rancher/k3s/server/manifests";
                   };
                 };
               }));
@@ -175,19 +175,26 @@ in {
         in builtins.path {
           path = (root + /${cfg.outputDir}/${cname});
         };
+
         mkModule = { cname, manifestsDir }: { pkgs, self, ... }: let
         in {
           system.activationScripts.k8strap-manifests.text = ''
             dest="${manifestsDir}"
-            mkdir -p "$dest"
-            ${getExe pkgs.rsync} -a --delete "${root + /${cfg.outputDir}/${cname}}" $dest/${cname}
+            mkdir -p "$dest/${cname}"
+            ${getExe pkgs.rsync} \
+            -a \
+            --delete \
+            "${root + /${cfg.outputDir}/${cname}}/k3s" $dest/${cname}
           '';
         };
       in
         mkMerge (mapAttrsToList
-          (cname: cval: mapAttrs' (host: cfg: {
+          (cname: cval: mapAttrs' (host: hostcfg: {
             name = "k8strap-${host}";
-            value = mkModule cname;
+            value = mkModule {
+              inherit cname;
+              inherit (hostcfg) manifestsDir;
+            };
           }) cval.k3sHosts)
           cfg.clusters);
     };
