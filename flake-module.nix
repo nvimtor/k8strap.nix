@@ -1,4 +1,4 @@
-{ inputs, lib, config, moduleWithSystem, ... }: let
+{ root, inputs, lib, config, moduleWithSystem, ... }: let
   inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
   inherit (lib.options) mkOption literalExpression;
   inherit (lib.lists) concatMap;
@@ -171,16 +171,16 @@ in {
 
     flake = {
       nixosModules = let
-        mkModule = cname: { pkgs, ... }: let
-          repoRoot   = inputs.self;
-          clusterDir = repoRoot + "/${cfg.outputDir}/${cname}";
+        readManifests = cname: let
+        in builtins.path {
+          path = (root + /${cfg.outputDir}/${cname});
+        };
+        mkModule = { cname, manifestsDir }: { pkgs, self, ... }: let
         in {
-          environment.etc."k8strap/${cname}".source = clusterDir;
-
           system.activationScripts.k8strap-manifests.text = ''
-            dest="${cfg.manifestsDir}"
+            dest="${manifestsDir}"
             mkdir -p "$dest"
-            ${getExe pkgs.rsync} -a --delete /etc/k8strap/${cname}/ "$dest/"
+            ${getExe pkgs.rsync} -a --delete "${root + /${cfg.outputDir}/${cname}}" $dest/${cname}
           '';
         };
       in
