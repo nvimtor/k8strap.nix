@@ -12,55 +12,63 @@ in {
       clusters = mkOption {
         description = "Kubernetes clusters";
         default = {};
-        type = types.attrsOf (types.submodule ({ name, config, ... }: {
+        type = types.attrsOf (types.submodule ({ name, config, ... }: let
+          cluster-name = name;
+        in {
           options = {
             kubenix = mkOption {
               type = types.submodule {
                 options = {
-                  crds = mkOption {
-                    type = types.listOf types.anything;
-                    description = ''Custom Resource Definitions (CRDs) to use for ${name}.
-                These will populate `kubenix.customTypes`.
-                    '';
-                    example = litExpr ''
-                      { kubenix }: { inputs, ... }: {
-                    imports = with kubenix.modules; [
-                      helm
-                    ];
+                  apps = mkOption {
+                    type = types.attrsOf (types.submodule ({ name, config, ... }: {
+                      options = {
+                        crds = mkOption {
+                          type = types.listOf types.anything;
+                          description = ''
+                            Custom Resource Definitions (CRDs) to use for ${name}.
+                            These will populate `kubenix.customTypes`.
+                          '';
+                          example = litExpr ''
+                            { kubenix }: { inputs, ... }: {
+                            imports = with kubenix.modules; [
+                              helm
+                            ];
 
-                    kubernetes.helm.releases.traefik = {
-                      namespace = "argocd";
-                      chart = kubenix.lib.helm.fetch {
-                      repo = "https://traefik.github.io/charts";
-                      chart   = "traefik-crds";
-                      version = "1.7.0";
-                      sha256 = "15ck4dljk2vv3k35cqbhximq3rh5kj83z3g3mmxq32m9laszmxq6";
+                            kubernetes.helm.releases.traefik = {
+                              namespace = "argocd";
+                              chart = kubenix.lib.helm.fetch {
+                                repo = "https://traefik.github.io/charts";
+                                chart   = "traefik-crds";
+                                version = "1.7.0";
+                                sha256 = "15ck4dljk2vv3k35cqbhximq3rh5kj83z3g3mmxq32m9laszmxq6";
+                                };
+                              };
+                            }
+                          '';
+                          default = [];
+                        };
+                        modules = mkOption {
+                          type = types.listOf types.anything;
+                          default = [];
+                          description = "Kubenix modules to use for ${cluster-name} and app ${name}";
+                          example = litExpr ''
+                            { kubenix }: { inputs, ... }: {
+                            imports = with kubenix.modules; [
+                              k8s
+                            ];
+
+                            kubernetes.resources.namespaces.argocd = { };
+                            }
+                          '';
+                        };
                       };
-                    };
-                  }
-                    '';
-                    default = [];
-                  };
-
-                  modules = mkOption {
-                    type = types.listOf types.anything;
-                    default = [];
-                    description = "Kubenix modules to use for ${name}";
-                    example = litExpr ''
-                      { kubenix }: { inputs, ... }: {
-                    imports = with kubenix.modules; [
-                       k8s
-                    ];
-
-                    kubernetes.resources.namespaces.argocd = { };
-                  }
-                    '';
+                    }));
                   };
 
                   specialArgs = mkOption {
                     type = types.lazyAttrsOf types.raw;
                     default = {};
-                    description = "${name}'s special arguments to be passed to Kubenix modules.";
+                    description = "${name}'s special arguments to be passed to all Kubenix modules.";
                     example = literalExpression ''
                       { foo = "bar"; }
                     '';
@@ -69,7 +77,12 @@ in {
                   template = mkOption {
                     type = types.str;
                     default = ''
-                      {{.kind}}-{{.metadata.name}}.yaml
+                    {{- $dir := (.metadata.namespace | default "_") -}}
+                    {{- $app := indexOrEmpty "kubenix/project-name" .metadata.annotations | default "" -}}
+                    {{- if $app -}}
+                      {{- $dir = printf "%s" $app -}}
+                    {{- end -}}
+                    {{ printf "%s/%s-%s.yaml" $dir .kind .metadata.name }}
                     '';
                     description = ''
                       By default, Kubenix generates a single file containing all resources.
@@ -125,28 +138,40 @@ in {
 
       clusterPkgs =
         mapAttrs (cname: cluster: let
-          manifests =
-            (inputs.kubenix.evalModules.${system} {
-              module = { kubenix, ... }: let
-                callWithKubenix = m: importApply m { inherit kubenix; };
-                crds = importApply ./kubenix/crd.nix
-                  (kubenix: map callWithKubenix cluster.kubenix.crds);
-              in {
-                imports = [ crds ] ++ (map callWithKubenix cluster.kubenix.modules);
-              };
-              specialArgs = {
-                inherit inputs;
-                kubenixPath = "${inputs.kubenix}";
-              } // cluster.kubenix.specialArgs;
-            }).config.kubernetes.resultYAML;
+          mkManifestFor = app: (inputs.kubenix.evalModules.${system} {
+            module = { kubenix, ... }: let
+              callWithKubenix = m: importApply m { inherit kubenix; };
+              crds = importApply ./kubenix/crd.nix
+                (kubenix: map callWithKubenix app.crds);
+            in {
+              imports = [
+                crds
+                {
+                  kubenix.project = app.name;
+                }
+              ] ++ (map callWithKubenix app.modules);
+            };
+            specialArgs = {
+              inherit inputs;
+              kubenixPath = "${inputs.kubenix}";
+            } // cluster.kubenix.specialArgs;
+          });
 
           sliceTpl = pkgs.writeText "slice.tpl" cluster.kubenix.template;
+
+          manifests = pkgs.linkFarm
+            "k8strap-manifests"
+            (mapAttrsToList (name: app: {
+              name = "${name}.yaml";
+              path = (mkManifestFor (app // { inherit name; })).config.kubernetes.resultYAML;
+            }) cluster.kubenix.apps);
         in mkDerivation {
           name = "${cname}-manifests";
           buildCommand = ''
             mkdir -p $out/${cname}
             ${kubectl-slice}/bin/kubectl-slice \
-            -f ${manifests} \
+            -d ${manifests} \
+            -r \
             -o $out/${cname}/ \
             -t "$(cat ${sliceTpl})"
           '';
@@ -178,13 +203,12 @@ in {
 
         mkModule = { cname, manifestsDir }: { pkgs, self, ... }: let
         in {
-          system.activationScripts.k8strap-manifests.text = ''
-            dest="${manifestsDir}"
-            mkdir -p "$dest/${cname}"
-            ${getExe pkgs.rsync} \
-            -a \
-            --delete \
-            "${root + /${cfg.outputDir}/${cname}}/k3s" $dest/${cname}
+          system.activationScripts.kapp-deploy.text = ''
+            KUBECONFIG=/etc/rancher/k3s/k3s.yaml \
+            ${getExe pkgs.kapp} app-group deploy \
+            -y \
+            -g apps \
+            --directory ${root + /${cfg.outputDir}/${cname}}
           '';
         };
       in
