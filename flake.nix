@@ -16,6 +16,10 @@
       url = "github:hall/kubenix";
     };
 
+    nix-kube-generators = {
+      url = "github:farcaller/nix-kube-generators";
+    };
+
     nixhelm = {
       url = "github:farcaller/nixhelm";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -29,7 +33,7 @@
 
       module = importApply
         ./flake-module.nix
-        { inherit (inputs) kubenix nixhelm; };
+        { inherit (inputs) kubenix nixhelm nix-kube-generators; };
     in {
       imports = [
         ./internal

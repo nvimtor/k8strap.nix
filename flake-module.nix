@@ -1,4 +1,4 @@
-{ kubenix, nixhelm, ... }:
+{ kubenix, nixhelm, nix-kube-generators, ... }:
 { root, inputs, lib, config, moduleWithSystem, ... }: let
   inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
   inherit (lib.options) mkOption literalExpression;
@@ -138,24 +138,29 @@ in {
 
           mkManifestFor = app: (kubenix.evalModules.${system} {
             module = { kubenix, ... }: let
-              inputs = {
-                inherit kubenix charts;
+              kubelib = nix-kube-generators.lib { inherit pkgs; };
+
+              kubenixProject = {
+                kubenix.project = app.name;
               };
 
-              callWithKubenix = m: importApply m inputs;
+              data = {
+                inherit kubenix charts kubelib;
+              };
+
+              callWithKubenix = m: importApply m data;
 
               crds = importApply ./kubenix/crd.nix
-                (kubenix: map (m: importApply m inputs) app.crds);
+                (kubenix: map (m: importApply m data) app.crds);
             in {
               imports = [
-                # crds
-                {
-                  kubenix.project = app.name;
-                }
+                crds
+                kubenixProject
               ] ++ (map callWithKubenix app.modules);
             };
             specialArgs = {
               inherit inputs;
+              inputs' = inputs;
               kubenixPath = "${kubenix}";
             } // cluster.specialArgs;
           });
