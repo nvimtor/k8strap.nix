@@ -1,3 +1,4 @@
+{ kubenix, nixhelm, ... }:
 { root, inputs, lib, config, moduleWithSystem, ... }: let
   inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
   inherit (lib.options) mkOption literalExpression;
@@ -16,82 +17,76 @@ in {
           cluster-name = name;
         in {
           options = {
-            kubenix = mkOption {
-              type = types.submodule {
+            apps = mkOption {
+              type = types.attrsOf (types.submodule ({ name, config, ... }: {
                 options = {
-                  apps = mkOption {
-                    type = types.attrsOf (types.submodule ({ name, config, ... }: {
-                      options = {
-                        crds = mkOption {
-                          type = types.listOf types.anything;
-                          description = ''
-                            Custom Resource Definitions (CRDs) to use for ${name}.
-                            These will populate `kubenix.customTypes`.
-                          '';
-                          example = litExpr ''
-                            { kubenix }: { inputs, ... }: {
-                            imports = with kubenix.modules; [
-                              helm
-                            ];
-
-                            kubernetes.helm.releases.traefik = {
-                              namespace = "argocd";
-                              chart = kubenix.lib.helm.fetch {
-                                repo = "https://traefik.github.io/charts";
-                                chart   = "traefik-crds";
-                                version = "1.7.0";
-                                sha256 = "15ck4dljk2vv3k35cqbhximq3rh5kj83z3g3mmxq32m9laszmxq6";
-                                };
-                              };
-                            }
-                          '';
-                          default = [];
-                        };
-                        modules = mkOption {
-                          type = types.listOf types.anything;
-                          default = [];
-                          description = "Kubenix modules to use for ${cluster-name} and app ${name}";
-                          example = litExpr ''
-                            { kubenix }: { inputs, ... }: {
-                            imports = with kubenix.modules; [
-                              k8s
-                            ];
-
-                            kubernetes.resources.namespaces.argocd = { };
-                            }
-                          '';
-                        };
-                      };
-                    }));
-                  };
-
-                  specialArgs = mkOption {
-                    type = types.lazyAttrsOf types.raw;
-                    default = {};
-                    description = "${name}'s special arguments to be passed to all Kubenix modules.";
-                    example = literalExpression ''
-                      { foo = "bar"; }
-                    '';
-                  };
-
-                  template = mkOption {
-                    type = types.str;
-                    default = ''
-                    {{- $dir := (.metadata.namespace | default "_") -}}
-                    {{- $app := indexOrEmpty "kubenix/project-name" .metadata.annotations | default "" -}}
-                    {{- if $app -}}
-                      {{- $dir = printf "%s" $app -}}
-                    {{- end -}}
-                    {{ printf "%s/%s-%s.yaml" $dir .kind .metadata.name }}
-                    '';
+                  crds = mkOption {
+                    type = types.listOf types.anything;
                     description = ''
-                      By default, Kubenix generates a single file containing all resources.
-                      This option lets you break it up using kubectl-slice.
+                      Custom Resource Definitions (CRDs) to use for ${cluster-name} and app ${name}.
+                      These will populate `kubenix.customTypes`.
+                    '';
+                    example = litExpr ''
+                      { kubenix }: { inputs, ... }: {
+                        imports = with kubenix.modules; [
+                          helm
+                        ];
+
+                        kubernetes.helm.releases.traefik = {
+                          namespace = "argocd";
+                          chart = kubenix.lib.helm.fetch {
+                            repo = "https://traefik.github.io/charts";
+                            chart   = "traefik-crds";
+                            version = "1.7.0";
+                            sha256 = "15ck4dljk2vv3k35cqbhximq3rh5kj83z3g3mmxq32m9laszmxq6";
+                          };
+                       };
+                     }
+                    '';
+                    default = [];
+                  };
+
+                  modules = mkOption {
+                    type = types.listOf types.anything;
+                    default = [];
+                    description = "Kubenix modules to use for ${cluster-name} and app ${name}";
+                    example = litExpr ''
+                    { kubenix }: { inputs, ... }: {
+                      imports = with kubenix.modules; [
+                        k8s
+                      ];
+
+                      kubernetes.resources.namespaces.argocd = { };
+                    }
                     '';
                   };
                 };
-              };
-              description = "Kubenix configuration for ${name}.";
+              }));
+            };
+
+            specialArgs = mkOption {
+              type = types.lazyAttrsOf types.raw;
+              default = {};
+              description = "${cluster-name}'s special arguments to be passed to all Kubenix modules.";
+              example = literalExpression ''
+                { foo = "bar"; }
+              '';
+            };
+
+            template = mkOption {
+              type = types.str;
+              default = ''
+                {{- $dir := (.metadata.namespace | default "_") -}}
+                {{- $app := indexOrEmpty "kubenix/project-name" .metadata.annotations | default "" -}}
+                {{- if $app -}}
+                  {{- $dir = printf "%s" $app -}}
+                {{- end -}}
+                {{ printf "%s/%s-%s.yaml" $dir .kind .metadata.name }}
+              '';
+              description = ''
+                By default, Kubenix generates a single file containing all resources.
+                This option lets you break it up using kubectl-slice.
+              '';
             };
 
             k3sHosts = mkOption {
@@ -107,6 +102,7 @@ in {
               }));
               default = {};
             };
+            description = "Kubenix configuration for ${name}.";
           };
         }));
       };
@@ -138,14 +134,21 @@ in {
 
       clusterPkgs =
         mapAttrs (cname: cluster: let
-          mkManifestFor = app: (inputs.kubenix.evalModules.${system} {
+          charts = nixhelm.chartsDerivations.${system};
+
+          mkManifestFor = app: (kubenix.evalModules.${system} {
             module = { kubenix, ... }: let
-              callWithKubenix = m: importApply m { inherit kubenix; };
+              inputs = {
+                inherit kubenix charts;
+              };
+
+              callWithKubenix = m: importApply m inputs;
+
               crds = importApply ./kubenix/crd.nix
-                (kubenix: map callWithKubenix app.crds);
+                (kubenix: map (m: importApply m inputs) app.crds);
             in {
               imports = [
-                crds
+                # crds
                 {
                   kubenix.project = app.name;
                 }
@@ -153,18 +156,18 @@ in {
             };
             specialArgs = {
               inherit inputs;
-              kubenixPath = "${inputs.kubenix}";
-            } // cluster.kubenix.specialArgs;
+              kubenixPath = "${kubenix}";
+            } // cluster.specialArgs;
           });
 
-          sliceTpl = pkgs.writeText "slice.tpl" cluster.kubenix.template;
+          sliceTpl = pkgs.writeText "slice.tpl" cluster.template;
 
           manifests = pkgs.linkFarm
             "k8strap-manifests"
             (mapAttrsToList (name: app: {
               name = "${name}.yaml";
               path = (mkManifestFor (app // { inherit name; })).config.kubernetes.resultYAML;
-            }) cluster.kubenix.apps);
+            }) cluster.apps);
         in mkDerivation {
           name = "${cname}-manifests";
           buildCommand = ''
@@ -187,7 +190,7 @@ in {
             set -euo pipefail
             dest="$PWD/${cfg.outputDir}/${cname}"
             mkdir -p "$dest"
-            rsync -aL --delete "${drv}/${cname}/" "$dest/"
+            rsync --recursive --delete -L --checksum "${drv}/${cname}/" "$dest/"
             echo "Copied → $dest"
           '';
         };

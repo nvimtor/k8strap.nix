@@ -11,34 +11,51 @@
     terranix = {
       url = "github:terranix/terranix";
     };
+
+    kubenix = {
+      url = "github:hall/kubenix";
+    };
+
+    nixhelm = {
+      url = "github:farcaller/nixhelm";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = inputs@{ flake-parts, nixpkgs, self, ... }: flake-parts.lib.mkFlake { inherit inputs; } {
-    imports = [
-      ./internal
-      ./flake-module.nix
-    ];
+  outputs = inputs@{ flake-parts, nixpkgs, ... }: flake-parts.lib.mkFlake
+    { inherit inputs; }
+    ({ flake-parts-lib, ... }: let
+      inherit (flake-parts-lib) importApply;
 
-    systems = [
-      "x86_64-linux"
-      "x86_64-darwin"
-      "aarch64-linux"
-      "aarch64-darwin"
-    ];
-
-    perSystem = { lib, config, system, ... }: let
-      overlays = [];
-
-      pkgs = import nixpkgs {
-        inherit system overlays;
-      };
+      module = importApply
+        ./flake-module.nix
+        { inherit (inputs) kubenix nixhelm; };
     in {
-      _module.args.pkgs = pkgs;
-    };
+      imports = [
+        ./internal
+        module
+      ];
 
-    flake = {
-      flakeModule = ./flake-module.nix;
-      flakeModules.default = ./flake-module.nix;
-    };
-  };
+      systems = [
+        "x86_64-linux"
+        "x86_64-darwin"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+
+      perSystem = { lib, config, system, ... }: let
+        overlays = [];
+
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
+      in {
+        _module.args.pkgs = pkgs;
+      };
+
+      flake = {
+        flakeModules.default = module;
+        flakeModule = module;
+      };
+    });
 }
