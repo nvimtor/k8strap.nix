@@ -121,6 +121,7 @@ in {
       inherit (pkgs.stdenv) mkDerivation;
 
       kubectl-slice = buildGo124Module rec {
+        name = "kubectl-slice";
         pname = "kubectl-slice";
         src = inputs.kubectl-slice-git;
         vendorHash = "sha256-Lly8gGLkpBAT+h1TJNkt39b5CCrn7xuVqrOjl7RWX7w=";
