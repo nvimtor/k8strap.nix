@@ -38,7 +38,12 @@
 
       module = importApply
         ./flake-module.nix
-        { inherit (inputs) kubenix nixhelm nix-kube-generators; };
+        { inherit (inputs)
+            kubenix
+            nixhelm
+            nix-kube-generators
+            kubectl-slice-git;
+        };
     in {
       imports = [
         ./internal
