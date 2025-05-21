@@ -170,11 +170,26 @@
         "type": "github"
       }
     },
+    "nix-kube-generators_2": {
+      "locked": {
+        "lastModified": 1729269463,
+        "narHash": "sha256-8jDDpC99fYl5CSHjZyPwb5PK7nQSknhkpfe8+DXI910=",
+        "owner": "farcaller",
+        "repo": "nix-kube-generators",
+        "rev": "2be4f3cb99e179d9f94e6c8723862421437f8efb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "farcaller",
+        "repo": "nix-kube-generators",
+        "type": "github"
+      }
+    },
     "nixhelm": {
       "inputs": {
         "flake-utils": "flake-utils",
         "haumea": "haumea",
-        "nix-kube-generators": "nix-kube-generators",
+        "nix-kube-generators": "nix-kube-generators_2",
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -285,6 +300,7 @@
       "inputs": {
         "flake-parts": "flake-parts",
         "kubenix": "kubenix",
+        "nix-kube-generators": "nix-kube-generators",
         "nixhelm": "nixhelm",
         "nixpkgs": "nixpkgs_2",
         "terranix": "terranix"

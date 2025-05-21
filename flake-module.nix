@@ -1,4 +1,4 @@
-{ kubenix, nixhelm, nix-kube-generators, ... }:
+{ kubenix, nixhelm, nix-kube-generators, kubectl-slice-git, ... }:
 { root, inputs, lib, config, moduleWithSystem, ... }: let
   inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
   inherit (lib.options) mkOption literalExpression;
@@ -121,15 +121,10 @@ in {
       inherit (pkgs.stdenv) mkDerivation;
 
       kubectl-slice = buildGo124Module rec {
+        name = "kubectl-slice";
         pname = "kubectl-slice";
-        version = "1.4.2";
-        src = fetchFromGitHub {
-          owner = "patrickdappollonio";
-          repo = pname;
-          tag = "v${version}";
-          hash = "sha256-C9YxMP9MCKJXh3wQ1JoilpzI3nIH3LnsTeVPMzri5h8=";
-        };
-        vendorHash = "sha256-Lly8gGLkpBAT+h1TJNkt39b5CCrn7xuVqrOjl7RWX7w=";
+        src = kubectl-slice-git;
+        vendorHash = "sha256-eJTD93hO917x4fPxqT71geifkzwHFo57r/Q0GjuOcvQ=";
       };
 
       clusterPkgs =

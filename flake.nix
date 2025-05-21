@@ -24,6 +24,11 @@
       url = "github:farcaller/nixhelm";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    kubectl-slice-git = {
+      url = "github:patrickdappollonio/kubectl-slice";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ flake-parts, nixpkgs, ... }: flake-parts.lib.mkFlake
@@ -33,7 +38,12 @@
 
       module = importApply
         ./flake-module.nix
-        { inherit (inputs) kubenix nixhelm nix-kube-generators; };
+        { inherit (inputs)
+            kubenix
+            nixhelm
+            nix-kube-generators
+            kubectl-slice-git;
+        };
     in {
       imports = [
         ./internal
