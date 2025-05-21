@@ -24,6 +24,11 @@
       url = "github:farcaller/nixhelm";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    kubectl-slice-git = {
+      url = "github:patrickdappollonio/kubectl-slice";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ flake-parts, nixpkgs, ... }: flake-parts.lib.mkFlake
