@@ -124,7 +124,7 @@ in {
         name = "kubectl-slice";
         pname = "kubectl-slice";
         src = kubectl-slice-git;
-        vendorHash = "sha256-Lly8gGLkpBAT+h1TJNkt39b5CCrn7xuVqrOjl7RWX7w=";
+        vendorHash = "sha256-eJTD93hO917x4fPxqT71geifkzwHFo57r/Q0GjuOcvQ=";
       };
 
       clusterPkgs =
