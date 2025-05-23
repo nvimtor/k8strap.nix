@@ -207,7 +207,18 @@ in {
         mkModule = { cname, manifestsDir }: { pkgs, self, ... }: let
         in {
           system.activationScripts.kapp-deploy.text = ''
-            KUBECONFIG=/etc/rancher/k3s/k3s.yaml \
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            attempts=0
+            max_attempts=60
+            until ${getExe pkgs.kubectl} get --raw=/healthz >/dev/null 2>&1; do
+                attempts=$((attempts + 1))
+                if [ $attempts -ge $max_attempts ]; then
+                echo "Timeout waiting for Kubernetes API to be ready"
+                exit 1
+                fi
+                echo "Waiting for Kubernetes API to be ready..."
+                sleep 5
+            done
             ${getExe pkgs.kapp} app-group deploy \
             -y \
             -g apps \
