@@ -140,21 +140,22 @@ in {
               };
 
               data = {
-                inherit kubenix charts kubelib;
+                inherit inputs kubenix charts kubelib;
               };
 
               callWithKubenix = m: importApply m data;
 
               crds = importApply ./kubenix/crd.nix
-                (kubenix: map (m: importApply m data) app.crds);
+                (_: map callWithKubenix app.crds);
+
+              apps = map callWithKubenix app.modules;
             in {
               imports = [
                 crds
                 kubenixProject
-              ] ++ (map callWithKubenix app.modules);
+              ] ++ apps;
             };
             specialArgs = {
-              inherit inputs;
               inputs' = inputs;
               kubenixPath = "${kubenix}";
             } // cluster.specialArgs;
