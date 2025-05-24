@@ -209,6 +209,7 @@ in {
           systemd.services.k8strap-deploy = {
             description = "Kubernetes Application Deployment Service";
             wantedBy = [ "multi-user.target" ];
+            after = [ "multi-user.target" ];
             serviceConfig = {
               Type = "oneshot";
               RemainAfterExit = true;
