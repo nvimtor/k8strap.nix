@@ -112,6 +112,22 @@
         "type": "github"
       }
     },
+    "kubectl-slice-git": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1746427466,
+        "narHash": "sha256-gvb0r+YKsU7AreXRljHex+wFsB83OspGhe6btvwPedw=",
+        "owner": "patrickdappollonio",
+        "repo": "kubectl-slice",
+        "rev": "4e0eea3a74ac873fb2e766295843748e463663bf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "patrickdappollonio",
+        "repo": "kubectl-slice",
+        "type": "github"
+      }
+    },
     "kubenix": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -299,6 +315,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
+        "kubectl-slice-git": "kubectl-slice-git",
         "kubenix": "kubenix",
         "nix-kube-generators": "nix-kube-generators",
         "nixhelm": "nixhelm",

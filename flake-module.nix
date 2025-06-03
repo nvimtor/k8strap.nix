@@ -93,6 +93,11 @@ in {
               description = "Apply k3s.";
               type = types.attrsOf (types.submodule ({ name, config, ... }: {
                 options = {
+                  kubeconfigPath = mkOption {
+                    type = types.str;
+                    description = "Where kubeconfig lives";
+                    default = "/etc/rancher/k3s/k3s.yaml";
+                  };
                   manifestsDir = mkOption {
                     type = types.str;
                     description = "Where k3s stores its manifests file for ${name}.";
@@ -204,10 +209,10 @@ in {
           path = (root + /${cfg.outputDir}/${cname});
         };
 
-        mkModule = { cname, manifestsDir }: { pkgs, self, ... }: let
+        mkModule = { cname, kubecfgPath, manifestsDir }: { pkgs, self, ... }: let
         in {
           system.activationScripts.kapp-deploy.text = ''
-            KUBECONFIG=/etc/rancher/k3s/k3s.yaml \
+            KUBECONFIG=${kubecfgPath} \
             ${getExe pkgs.kapp} app-group deploy \
             -y \
             -g apps \
@@ -221,6 +226,7 @@ in {
             value = mkModule {
               inherit cname;
               inherit (hostcfg) manifestsDir;
+              inherit (hostcfg) kubeconfigPath;
             };
           }) cval.k3sHosts)
           cfg.clusters);
