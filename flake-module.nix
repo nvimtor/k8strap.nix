@@ -149,7 +149,7 @@ in {
 
               data = {
                 inherit kubenix charts kubelib;
-              };
+              } // cluster.specialArgs;
 
               callWithKubenix = m: importApply m data;
 
