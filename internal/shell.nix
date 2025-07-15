@@ -4,6 +4,7 @@
       default = pkgs.mkShell {
         buildInputs = with pkgs; [
           git-crypt
+          sops
         ];
       };
     };

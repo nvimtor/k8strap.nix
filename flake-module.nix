@@ -1,3 +1,6 @@
+# TODO create the first
+# FIXME k3s distributions
+
 { kubenix, nixhelm, nix-kube-generators, kubectl-slice-git, ... }:
 { root, inputs, lib, config, moduleWithSystem, ... }: let
   inherit (lib.attrsets) foldlAttrs mapAttrs' attrValues mapAttrsToList concatMapAttrs;
@@ -160,6 +163,7 @@ in {
             };
             specialArgs = {
               inherit inputs;
+              inherit kubenix;
               inputs' = inputs;
               kubenixPath = "${kubenix}";
             } // cluster.specialArgs;
@@ -232,4 +236,28 @@ in {
           cfg.clusters);
     };
   };
+
+  # mkKubeDeriv = { pkgs, ... }: {
+  #   perSystem = { system , ... }: {
+  #     rancher = {
+  #       options = {
+  #         k3s = mkOption {
+  #           type = types.string;
+  #           description = ''
+  #             This is specific to the k3s distribution;
+  #             Do not use if the host isn't k3s.
+  #          '';
+  #         };
+  #         k8s = mkOption {
+  #           type = types.string;
+  #           default = "/etc/rancher/k3s/k3s.yaml";
+  #           description = ''
+  #             Where the kubeconfig is stored.
+  #             The default value is for k3s distributions.
+  #           '';
+  #         };
+  #       };
+  #     };
+  #   };
+  # };
 }

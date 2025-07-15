@@ -1,5 +1,5 @@
-withKubenix: { inputs', kubenixPath, config, pkgs, lib, ... }: let
-  crds = (inputs'.kubenix.evalModules.aarch64-darwin {
+withKubenix: { inputs', kubenix, kubenixPath, config, pkgs, lib, ... }: let
+  crds = (kubenix.evalModules.aarch64-darwin {
     module = { kubenix, ... }: {
       imports = (withKubenix kubenix) ++ [kubenix.modules.k8s];
     };

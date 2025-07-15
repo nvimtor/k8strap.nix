@@ -10,3 +10,4 @@
 !terraform.tfstate
 !.gitignore
 !.gitattributes
+!.sops.yaml
