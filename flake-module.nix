@@ -96,7 +96,7 @@ in {
               description = "Apply k3s.";
               type = types.attrsOf (types.submodule ({ name, config, ... }: {
                 options = {
-                  kubeconfigPath = mkOption {
+                  kubecfgPath = mkOption {
                     type = types.str;
                     description = "Where kubeconfig lives";
                     default = "/etc/rancher/k3s/k3s.yaml";
@@ -230,7 +230,7 @@ in {
             value = mkModule {
               inherit cname;
               inherit (hostcfg) manifestsDir;
-              inherit (hostcfg) kubeconfigPath;
+              inherit (hostcfg) kubecfgPath;
             };
           }) cval.k3sHosts)
           cfg.clusters);
